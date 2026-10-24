@@ -163,7 +163,7 @@ func (s *ServerManager) Init(opts InitOptions) error {
 			PrivateKey: serverKeys.PrivateKey,
 			Address:    []string{opts.ServerIPv4},
 			ListenPort: opts.Port,
-			DNS:        dnsList,
+			// Note: Server interface does NOT set DNS; DNS is only pushed to connecting clients
 			PostUp:     postUp,
 			PostDown:   postDown,
 			SaveConfig: false,
