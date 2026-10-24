@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -18,9 +19,16 @@ import (
 	"github.com/ezwg/ezwg/internal/wireguard"
 )
 
+//go:embed icon.png
+var appIconBytes []byte
+
 func main() {
 	myApp := app.NewWithID("com.ezwg.client")
-	myWindow := myApp.NewWindow("Easy WireGuard (ezwg)")
+	iconResource := fyne.NewStaticResource("icon.png", appIconBytes)
+	myApp.SetIcon(iconResource)
+
+	myWindow := myApp.NewWindow("Easy WireGuard")
+	myWindow.SetIcon(iconResource)
 	myWindow.Resize(fyne.NewSize(520, 560))
 	myWindow.SetFixedSize(false)
 
