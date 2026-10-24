@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -22,15 +23,40 @@ import (
 //go:embed icon.png
 var appIconBytes []byte
 
+//go:embed tray_icon.png
+var trayIconBytes []byte
+
+//go:embed tray_connected.png
+var trayConnectedIconBytes []byte
+
 func main() {
 	myApp := app.NewWithID("com.ezwg.client")
 	iconResource := fyne.NewStaticResource("icon.png", appIconBytes)
+	trayDefaultResource := fyne.NewStaticResource("tray_icon.png", trayIconBytes)
+	trayConnectedResource := fyne.NewStaticResource("tray_connected.png", trayConnectedIconBytes)
+
 	myApp.SetIcon(iconResource)
 
 	myWindow := myApp.NewWindow("Easy WireGuard")
 	myWindow.SetIcon(iconResource)
 	myWindow.Resize(fyne.NewSize(520, 560))
 	myWindow.SetFixedSize(false)
+
+	// Intercept window close so the application stays alive in the system tray / menu bar
+	myWindow.SetCloseIntercept(func() {
+		myWindow.Hide()
+	})
+
+	// Restore window when clicking Dock icon in macOS
+	myApp.Lifecycle().SetOnEnteredForeground(func() {
+		myWindow.Show()
+	})
+
+	var desk desktop.App
+	if d, ok := myApp.(desktop.App); ok {
+		desk = d
+		desk.SetSystemTrayIcon(trayDefaultResource)
+	}
 
 	cm, err := client.NewClientManager()
 	if err != nil {
@@ -55,6 +81,91 @@ func main() {
 
 	// Connect/Disconnect Button
 	var toggleBtn *widget.Button
+
+	var updateStatusDisplay func()
+
+	updateTrayMenu := func(active string, profiles []client.ProfileInfo) {
+		if desk == nil {
+			return
+		}
+
+		var menuItems []*fyne.MenuItem
+
+		if active != "" {
+			desk.SetSystemTrayIcon(trayConnectedResource)
+
+			statusItem := fyne.NewMenuItem(fmt.Sprintf("● Connected: %s", active), nil)
+			statusItem.Disabled = true
+			menuItems = append(menuItems, statusItem)
+
+			menuItems = append(menuItems, fyne.NewMenuItemSeparator())
+
+			disconnectItem := fyne.NewMenuItem(fmt.Sprintf("Disconnect '%s'", active), func() {
+				go func() {
+					err := cm.Disconnect(active)
+					if err != nil {
+						myApp.SendNotification(fyne.NewNotification("Easy WireGuard", fmt.Sprintf("Disconnect failed: %v", err)))
+					} else {
+						myApp.SendNotification(fyne.NewNotification("Easy WireGuard", fmt.Sprintf("Disconnected from '%s'", active)))
+					}
+					if updateStatusDisplay != nil {
+						updateStatusDisplay()
+					}
+				}()
+			})
+			menuItems = append(menuItems, disconnectItem)
+		} else {
+			desk.SetSystemTrayIcon(trayDefaultResource)
+
+			statusItem := fyne.NewMenuItem("○ Status: Disconnected", nil)
+			statusItem.Disabled = true
+			menuItems = append(menuItems, statusItem)
+
+			menuItems = append(menuItems, fyne.NewMenuItemSeparator())
+
+			if len(profiles) > 0 {
+				for _, p := range profiles {
+					profName := p.Name
+					connectItem := fyne.NewMenuItem(fmt.Sprintf("Connect '%s'", profName), func() {
+						go func() {
+							err := cm.Connect(profName)
+							if err != nil {
+								myApp.SendNotification(fyne.NewNotification("Easy WireGuard", fmt.Sprintf("Connection failed: %v", err)))
+							} else {
+								myApp.SendNotification(fyne.NewNotification("Easy WireGuard", fmt.Sprintf("Connected to '%s'", profName)))
+							}
+							if updateStatusDisplay != nil {
+								updateStatusDisplay()
+							}
+						}()
+					})
+					menuItems = append(menuItems, connectItem)
+				}
+			} else {
+				noProf := fyne.NewMenuItem("No Profiles Available", nil)
+				noProf.Disabled = true
+				menuItems = append(menuItems, noProf)
+			}
+		}
+
+		menuItems = append(menuItems, fyne.NewMenuItemSeparator())
+
+		showItem := fyne.NewMenuItem("Open Easy WireGuard", func() {
+			myWindow.Show()
+			myWindow.RequestFocus()
+		})
+		menuItems = append(menuItems, showItem)
+
+		menuItems = append(menuItems, fyne.NewMenuItemSeparator())
+
+		quitItem := fyne.NewMenuItem("Quit Easy WireGuard", func() {
+			myApp.Quit()
+		})
+		menuItems = append(menuItems, quitItem)
+
+		trayMenu := fyne.NewMenu("Easy WireGuard", menuItems...)
+		desk.SetSystemTrayMenu(trayMenu)
+	}
 
 	refreshProfiles := func() {
 		if cm == nil {
@@ -85,13 +196,16 @@ func main() {
 			selectedProfile = ""
 		}
 		profileSelect.Refresh()
+		active, _ := cm.GetActiveProfile()
+		updateTrayMenu(active, profiles)
 	}
 
-	updateStatusDisplay := func() {
+	updateStatusDisplay = func() {
 		if cm == nil {
 			return
 		}
 		active, _ := cm.GetActiveProfile()
+		profiles, _ := cm.ListProfiles()
 		if active != "" {
 			statusIcon.SetResource(theme.ConfirmIcon())
 			statusLabel.SetText(fmt.Sprintf("Connected to: %s", active))
@@ -137,7 +251,6 @@ func main() {
 		}
 
 		if selectedProfile != "" {
-			profiles, _ := cm.ListProfiles()
 			for _, p := range profiles {
 				if p.Name == selectedProfile {
 					ipLabel.SetText(p.ClientIP)
@@ -153,6 +266,7 @@ func main() {
 
 		toggleBtn.Refresh()
 		statusContainer.Refresh()
+		updateTrayMenu(active, profiles)
 	}
 
 	profileSelect = widget.NewSelect([]string{}, func(s string) {
