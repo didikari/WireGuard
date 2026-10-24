@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,6 +115,18 @@ func (c *ClientManager) Connect(name string) error {
 
 	// Bring up the tunnel
 	if err := runPrivilegedWgQuick("up", profilePath); err != nil {
+		if strings.Contains(err.Error(), "already exists as") {
+			// Tunnel is already connected. Ensure state permissions and treat as success.
+			if runtime.GOOS == "darwin" {
+				_ = exec.Command("osascript",
+					"-e", "on run argv",
+					"-e", "do shell script (item 1 of argv) with administrator privileges",
+					"-e", "end run",
+					"chmod 666 /var/run/wireguard/* 2>/dev/null || true",
+				).Run()
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to connect profile '%s': %w", resolvedName, err)
 	}
 
@@ -183,16 +196,21 @@ func runPrivilegedWgQuick(action, profilePath string) error {
 		return nil
 	}
 
-	// On macOS: Use AppleScript to trigger native macOS administrator authorization prompt (Touch ID / Password)
+	// On macOS: Use AppleScript with argv to trigger native macOS administrator authorization prompt (Touch ID / Password)
 	if runtime.GOOS == "darwin" {
 		baseName := strings.TrimSuffix(filepath.Base(profilePath), ".conf")
-		cmdStr := fmt.Sprintf("%s %s \"%s\"", wgQuickPath, action, profilePath)
+		shellCmd := fmt.Sprintf(`export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; "%s" up "%s" && chmod 666 /var/run/wireguard/* 2>/dev/null || true`, wgQuickPath, profilePath)
 		if action == "down" {
 			// If tunnel was already down or ungracefully terminated, clean up stale state file
-			cmdStr = fmt.Sprintf("%s %s \"%s\" 2>/dev/null || rm -f /var/run/wireguard/%s.name", wgQuickPath, action, profilePath, baseName)
+			shellCmd = fmt.Sprintf(`export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; "%s" down "%s" 2>/dev/null || rm -f "/var/run/wireguard/%s.name"`, wgQuickPath, profilePath, baseName)
 		}
-		script := fmt.Sprintf(`do shell script "%s" with administrator privileges`, cmdStr)
-		cmd := exec.Command("osascript", "-e", script)
+
+		cmd := exec.Command("osascript",
+			"-e", "on run argv",
+			"-e", "do shell script (item 1 of argv) with administrator privileges",
+			"-e", "end run",
+			shellCmd,
+		)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			outStr := strings.TrimSpace(string(out))
@@ -370,35 +388,58 @@ func sanitizeProfileName(name string) string {
 
 // PingServer tests latency to server endpoint or IP.
 func PingServer(target string) string {
+	if target == "" || target == "-" {
+		return "-"
+	}
+
 	// Strip port if present
 	host := target
 	if strings.Contains(target, ":") {
-		h, _, err := strings.Cut(target, ":")
-		if err {
+		h, _, found := strings.Cut(target, ":")
+		if found && h != "" {
 			host = h
 		}
 	}
 
-	var cmd *exec.Cmd
-	if runtime.GOOS == "darwin" {
-		cmd = exec.Command("ping", "-c", "1", "-W", "2000", host)
-	} else {
-		cmd = exec.Command("ping", "-c", "1", "-W", "2", host)
+	measure := func(h string) string {
+		var cmd *exec.Cmd
+		if runtime.GOOS == "darwin" {
+			cmd = exec.Command("ping", "-c", "2", "-W", "1500", h)
+		} else {
+			cmd = exec.Command("ping", "-c", "2", "-W", "2", h)
+		}
+
+		out, err := cmd.Output()
+		if err != nil {
+			return ""
+		}
+
+		outputStr := string(out)
+		if idx := strings.LastIndex(outputStr, "="); idx != -1 {
+			after := strings.TrimSpace(outputStr[idx+1:])
+			vals := strings.Split(after, "/")
+			if len(vals) >= 2 {
+				f, parseErr := strconv.ParseFloat(vals[1], 64)
+				if parseErr == nil {
+					return fmt.Sprintf("%.1f ms", f)
+				}
+				return fmt.Sprintf("%s ms", vals[1])
+			}
+		}
+		return "reachable"
 	}
 
-	out, err := cmd.Output()
-	if err != nil {
-		return "unreachable"
+	// First try target host
+	if res := measure(host); res != "" {
+		return res
 	}
 
-	// Parse avg time
-	outputStr := string(out)
-	if idx := strings.Index(outputStr, "avg"); idx != -1 {
-		line := outputStr[idx:]
-		parts := strings.Split(line, "/")
-		if len(parts) >= 5 {
-			return fmt.Sprintf("%s ms", parts[4])
+	// Fallback to VPN gateway if target ICMP was blocked by WAN firewall
+	for _, fallback := range []string{"10.8.0.1", "1.1.1.1"} {
+		if res := measure(fallback); res != "" {
+			return res
 		}
 	}
-	return "reachable"
+
+	return "unreachable"
 }
