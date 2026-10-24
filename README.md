@@ -24,19 +24,35 @@
 
 ---
 
-## 📥 Cara Install (Linux & macOS)
+## 📥 Cara Install Terpisah (Client vs Server)
 
-### 1. Menggunakan One-Line Installer (Rekomendasi)
+### A. Install Client Desktop GUI (Untuk Laptop Mac / Linux Pengguna)
 
-Jalankan perintah ini di terminal **macOS** atau **Linux**:
+#### Opsi 1: Download Installer DMG (macOS - Paling Mudah)
+Pengguna Mac cukup mengunduh file **`Easy-WireGuard.dmg`** dari [GitHub Releases](https://github.com/didikari/WireGuard/releases), buka filenya, lalu seret ke folder **Applications**.
+
+#### Opsi 2: Menggunakan One-Liner Script (macOS & Linux)
+Jalankan perintah ini di terminal laptop Anda:
+```bash
+curl -fsSL https://raw.githubusercontent.com/didikari/WireGuard/main/scripts/install-app.sh | bash
+```
+* **Di Mac**: Otomatis memasang **Easy WireGuard.app** ke folder `/Applications` dan menyiapkan dependensi WireGuard via Homebrew jika diperlukan.
+* **Di Linux**: Otomatis memasang launcher **Easy WireGuard** ke Menu Aplikasi desktop.
+
+---
+
+### B. Install Server & CLI (Untuk Server VPS Linux)
+
+Khusus di server VPS Linux (headless / tanpa tampilan grafis), pasang CLI & Server Suite ringan dengan satu baris perintah:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/didikari/WireGuard/main/scripts/install.sh | bash
 ```
 
-**Hasil instalasi otomatis:**
-* **Di macOS**: Aplikasi **`Easy WireGuard.app`** otomatis terpasang di folder `/Applications` (bisa dibuka langsung dari Launchpad / Spotlight) serta CLI `ezwg` di terminal.
-* **Di Linux**: Launcher desktop otomatis terpasang di menu aplikasi (Ubuntu Dash / GNOME / KDE) serta CLI `ezwg` di `/usr/local/bin`.
+Setelah selesai, langsung buka wizard kontrol server dengan:
+```bash
+sudo ezwg server
+```
 
 ---
 

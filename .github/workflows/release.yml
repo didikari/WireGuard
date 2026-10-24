@@ -33,6 +33,8 @@ jobs:
         with:
           files: |
             dist/*.tar.gz
+            dist/*.dmg
+            dist/*.zip
             dist/checksums.txt
           draft: false
           prerelease: false
