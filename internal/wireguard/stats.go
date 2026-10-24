@@ -33,12 +33,49 @@ type InterfaceStatus struct {
 	Peers       map[string]PeerStatus `json:"peers"` // keyed by public key
 }
 
+// ResolveRealInterface resolves the OS-level interface (e.g. utun5 on macOS) for a profile name.
+func ResolveRealInterface(iface string) string {
+	if runtime.GOOS != "darwin" {
+		return iface
+	}
+	stateDirs := []string{
+		"/var/run/wireguard",
+		"/opt/homebrew/var/run/wireguard",
+		"/usr/local/var/run/wireguard",
+	}
+	for _, dir := range stateDirs {
+		targetFile := filepath.Join(dir, fmt.Sprintf("%s.name", iface))
+		content, err := os.ReadFile(targetFile)
+		if err == nil {
+			realName := strings.TrimSpace(string(content))
+			if realName != "" {
+				return realName
+			}
+		}
+		if stat, statErr := os.Stat(targetFile); statErr == nil {
+			entries, _ := os.ReadDir(dir)
+			for _, entry := range entries {
+				if strings.HasSuffix(entry.Name(), ".sock") {
+					if sockInfo, errSock := entry.Info(); errSock == nil {
+						diff := stat.ModTime().Sub(sockInfo.ModTime())
+						if diff < 10*time.Second && diff > -10*time.Second {
+							return strings.TrimSuffix(entry.Name(), ".sock")
+						}
+					}
+				}
+			}
+		}
+	}
+	return iface
+}
+
 // GetInterfaceStatus retrieves the parsed runtime stats from `wg show <iface> dump`.
 func GetInterfaceStatus(iface string) (*InterfaceStatus, error) {
-	cmd := exec.Command("wg", "show", iface, "dump")
+	realIface := ResolveRealInterface(iface)
+	cmd := exec.Command("wg", "show", realIface, "dump")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run wg show %s dump: %w", iface, err)
+		return nil, fmt.Errorf("failed to run wg show %s dump: %w", realIface, err)
 	}
 
 	return ParseWgDump(iface, string(output))
@@ -59,13 +96,35 @@ func GetAllInterfaces() ([]string, error) {
 				for _, entry := range entries {
 					if strings.HasSuffix(entry.Name(), ".name") {
 						name := strings.TrimSuffix(entry.Name(), ".name")
-						content, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
+						nameFile := filepath.Join(dir, entry.Name())
+						nameStat, errStat := os.Stat(nameFile)
+						if errStat != nil {
+							continue
+						}
+
+						realIface := ""
+						content, readErr := os.ReadFile(nameFile)
 						if readErr == nil {
-							realIface := strings.TrimSpace(string(content))
-							if realIface != "" {
-								sockFile := filepath.Join(dir, fmt.Sprintf("%s.sock", realIface))
-								if _, statErr := os.Stat(sockFile); statErr == nil {
-									active = append(active, name)
+							realIface = strings.TrimSpace(string(content))
+						}
+
+						if realIface != "" {
+							sockFile := filepath.Join(dir, fmt.Sprintf("%s.sock", realIface))
+							if _, statErr := os.Stat(sockFile); statErr == nil {
+								active = append(active, name)
+								continue
+							}
+						}
+
+						// Fallback if file was not readable (mode 0400): check timestamp match with socket
+						for _, sockEntry := range entries {
+							if strings.HasSuffix(sockEntry.Name(), ".sock") {
+								if sockInfo, sockErr := sockEntry.Info(); sockErr == nil {
+									diff := nameStat.ModTime().Sub(sockInfo.ModTime())
+									if diff < 10*time.Second && diff > -10*time.Second {
+										active = append(active, name)
+										break
+									}
 								}
 							}
 						}

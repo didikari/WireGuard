@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // TunnelManager manages bringing WireGuard interfaces up and down.
@@ -75,6 +76,12 @@ func (m *TunnelManager) IsInterfaceUp(iface string) bool {
 		}
 		for _, dir := range stateDirs {
 			targetFile := filepath.Join(dir, fmt.Sprintf("%s.name", iface))
+			nameStat, errStat := os.Stat(targetFile)
+			if errStat != nil {
+				continue
+			}
+
+			// Try reading real interface name
 			content, err := os.ReadFile(targetFile)
 			if err == nil {
 				realIface := strings.TrimSpace(string(content))
@@ -82,6 +89,21 @@ func (m *TunnelManager) IsInterfaceUp(iface string) bool {
 					sockFile := filepath.Join(dir, fmt.Sprintf("%s.sock", realIface))
 					if _, statErr := os.Stat(sockFile); statErr == nil {
 						return true
+					}
+				}
+			}
+
+			// Fallback: match timestamp with any .sock in directory
+			entries, readErr := os.ReadDir(dir)
+			if readErr == nil {
+				for _, entry := range entries {
+					if strings.HasSuffix(entry.Name(), ".sock") {
+						if sockInfo, errInfo := entry.Info(); errInfo == nil {
+							diff := nameStat.ModTime().Sub(sockInfo.ModTime())
+							if diff < 10*time.Second && diff > -10*time.Second {
+								return true
+							}
+						}
 					}
 				}
 			}
