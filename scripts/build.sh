@@ -44,10 +44,21 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     rm -rf "${TARGET_DIR}"
 done
 
+# If building on macOS, package the Desktop App (.app, .dmg, .zip)
+if [ "$(uname -s)" = "Darwin" ]; then
+    ./scripts/package-mac.sh
+fi
+
 # Generate SHA256 Checksums
 echo "🔐 Generating checksums..."
 cd "${OUTPUT_DIR}"
 shasum -a 256 *.tar.gz > checksums.txt
+if [ -f "Easy-WireGuard.dmg" ]; then
+    shasum -a 256 Easy-WireGuard.dmg >> checksums.txt
+fi
+if [ -f "Easy-WireGuard-macOS.zip" ]; then
+    shasum -a 256 Easy-WireGuard-macOS.zip >> checksums.txt
+fi
 cd ..
 
 echo "✅ Build complete! Release archives located in ${OUTPUT_DIR}/:"
