@@ -2,7 +2,9 @@ package wireguard
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -65,6 +67,20 @@ func (m *TunnelManager) SyncConfig(iface, configFile string) error {
 
 // IsInterfaceUp checks if the interface is currently active.
 func (m *TunnelManager) IsInterfaceUp(iface string) bool {
+	if runtime.GOOS == "darwin" {
+		stateDirs := []string{
+			"/var/run/wireguard",
+			"/opt/homebrew/var/run/wireguard",
+			"/usr/local/var/run/wireguard",
+		}
+		for _, dir := range stateDirs {
+			targetFile := filepath.Join(dir, fmt.Sprintf("%s.name", iface))
+			if _, err := os.Stat(targetFile); err == nil {
+				return true
+			}
+		}
+	}
+
 	ifaces, err := GetAllInterfaces()
 	if err != nil {
 		return false

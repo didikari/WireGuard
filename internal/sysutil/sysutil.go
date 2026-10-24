@@ -20,6 +20,16 @@ func IsRoot() bool {
 	return os.Geteuid() == 0
 }
 
+func init() {
+	if runtime.GOOS == "darwin" {
+		curPath := os.Getenv("PATH")
+		extraPaths := "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+		if !strings.Contains(curPath, "/opt/homebrew/bin") {
+			os.Setenv("PATH", extraPaths+":"+curPath)
+		}
+	}
+}
+
 // EnsureRoot checks if the program is run as root. If not, returns a descriptive error.
 func EnsureRoot() error {
 	if !IsRoot() {

@@ -3,7 +3,9 @@ package wireguard
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +45,29 @@ func GetInterfaceStatus(iface string) (*InterfaceStatus, error) {
 
 // GetAllInterfaces lists all active WireGuard interface names.
 func GetAllInterfaces() ([]string, error) {
+	if runtime.GOOS == "darwin" {
+		var active []string
+		stateDirs := []string{
+			"/var/run/wireguard",
+			"/opt/homebrew/var/run/wireguard",
+			"/usr/local/var/run/wireguard",
+		}
+		for _, dir := range stateDirs {
+			entries, err := os.ReadDir(dir)
+			if err == nil {
+				for _, entry := range entries {
+					if strings.HasSuffix(entry.Name(), ".name") {
+						name := strings.TrimSuffix(entry.Name(), ".name")
+						active = append(active, name)
+					}
+				}
+			}
+		}
+		if len(active) > 0 {
+			return active, nil
+		}
+	}
+
 	cmd := exec.Command("wg", "show", "interfaces")
 	out, err := cmd.Output()
 	if err != nil {

@@ -113,17 +113,8 @@ func (c *ClientManager) Connect(name string) error {
 	}
 
 	// Bring up the tunnel
-	if sysutil.IsRoot() {
-		return c.tm.Up(profilePath)
-	}
-
-	// If not root, execute with sudo
-	cmd := exec.Command("sudo", "wg-quick", "up", profilePath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to connect profile '%s' via sudo wg-quick: %w", resolvedName, err)
+	if err := runPrivilegedWgQuick("up", profilePath); err != nil {
+		return fmt.Errorf("failed to connect profile '%s': %w", resolvedName, err)
 	}
 
 	return nil
@@ -140,16 +131,64 @@ func (c *ClientManager) Disconnect(name string) error {
 		return fmt.Errorf("profile '%s' is not currently active", resolvedName)
 	}
 
-	if sysutil.IsRoot() {
-		return c.tm.Down(profilePath)
+	if err := runPrivilegedWgQuick("down", profilePath); err != nil {
+		return fmt.Errorf("failed to disconnect profile '%s': %w", resolvedName, err)
 	}
 
-	cmd := exec.Command("sudo", "wg-quick", "down", profilePath)
+	return nil
+}
+
+func runPrivilegedWgQuick(action, profilePath string) error {
+	wgQuickPath, err := exec.LookPath("wg-quick")
+	if err != nil {
+		for _, p := range []string{"/opt/homebrew/bin/wg-quick", "/usr/local/bin/wg-quick", "/usr/bin/wg-quick"} {
+			if _, statErr := os.Stat(p); statErr == nil {
+				wgQuickPath = p
+				break
+			}
+		}
+	}
+	if wgQuickPath == "" {
+		return fmt.Errorf("wg-quick executable not found. Please install wireguard-tools (e.g. brew install wireguard-tools)")
+	}
+
+	if sysutil.IsRoot() {
+		cmd := exec.Command(wgQuickPath, action, profilePath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s (%w)", strings.TrimSpace(string(out)), err)
+		}
+		return nil
+	}
+
+	// On macOS: Use AppleScript to trigger native macOS administrator authorization prompt (Touch ID / Password)
+	if runtime.GOOS == "darwin" {
+		script := fmt.Sprintf(`do shell script "%s %s \"%s\"" with administrator privileges`, wgQuickPath, action, profilePath)
+		cmd := exec.Command("osascript", "-e", script)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("authorization failed or cancelled: %s", strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+
+	// On Linux: If graphical display is active, use pkexec for native GUI auth dialog
+	if _, err := exec.LookPath("pkexec"); err == nil && os.Getenv("DISPLAY") != "" {
+		cmd := exec.Command("pkexec", wgQuickPath, action, profilePath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("pkexec failed: %s", strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+
+	// Fallback to sudo (terminal execution)
+	cmd := exec.Command("sudo", wgQuickPath, action, profilePath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to disconnect profile '%s': %w", resolvedName, err)
+		return fmt.Errorf("sudo wg-quick failed: %w", err)
 	}
 
 	return nil
