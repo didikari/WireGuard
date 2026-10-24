@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -58,14 +59,21 @@ func GetAllInterfaces() ([]string, error) {
 				for _, entry := range entries {
 					if strings.HasSuffix(entry.Name(), ".name") {
 						name := strings.TrimSuffix(entry.Name(), ".name")
-						active = append(active, name)
+						content, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
+						if readErr == nil {
+							realIface := strings.TrimSpace(string(content))
+							if realIface != "" {
+								sockFile := filepath.Join(dir, fmt.Sprintf("%s.sock", realIface))
+								if _, statErr := os.Stat(sockFile); statErr == nil {
+									active = append(active, name)
+								}
+							}
+						}
 					}
 				}
 			}
 		}
-		if len(active) > 0 {
-			return active, nil
-		}
+		return active, nil
 	}
 
 	cmd := exec.Command("wg", "show", "interfaces")

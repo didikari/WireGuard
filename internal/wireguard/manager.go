@@ -75,10 +75,18 @@ func (m *TunnelManager) IsInterfaceUp(iface string) bool {
 		}
 		for _, dir := range stateDirs {
 			targetFile := filepath.Join(dir, fmt.Sprintf("%s.name", iface))
-			if _, err := os.Stat(targetFile); err == nil {
-				return true
+			content, err := os.ReadFile(targetFile)
+			if err == nil {
+				realIface := strings.TrimSpace(string(content))
+				if realIface != "" {
+					sockFile := filepath.Join(dir, fmt.Sprintf("%s.sock", realIface))
+					if _, statErr := os.Stat(sockFile); statErr == nil {
+						return true
+					}
+				}
 			}
 		}
+		return false
 	}
 
 	ifaces, err := GetAllInterfaces()

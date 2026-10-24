@@ -128,14 +128,36 @@ func (c *ClientManager) Disconnect(name string) error {
 	}
 
 	if !c.tm.IsInterfaceUp(resolvedName) {
-		return fmt.Errorf("profile '%s' is not currently active", resolvedName)
+		cleanupMacStaleState(resolvedName)
+		return nil
 	}
 
 	if err := runPrivilegedWgQuick("down", profilePath); err != nil {
+		if strings.Contains(err.Error(), "is not a WireGuard interface") ||
+			strings.Contains(err.Error(), "not found") {
+			cleanupMacStaleState(resolvedName)
+			return nil
+		}
 		return fmt.Errorf("failed to disconnect profile '%s': %w", resolvedName, err)
 	}
 
+	cleanupMacStaleState(resolvedName)
 	return nil
+}
+
+func cleanupMacStaleState(iface string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	stateDirs := []string{
+		"/var/run/wireguard",
+		"/opt/homebrew/var/run/wireguard",
+		"/usr/local/var/run/wireguard",
+	}
+	for _, dir := range stateDirs {
+		targetFile := filepath.Join(dir, fmt.Sprintf("%s.name", iface))
+		_ = os.Remove(targetFile)
+	}
 }
 
 func runPrivilegedWgQuick(action, profilePath string) error {
@@ -163,11 +185,21 @@ func runPrivilegedWgQuick(action, profilePath string) error {
 
 	// On macOS: Use AppleScript to trigger native macOS administrator authorization prompt (Touch ID / Password)
 	if runtime.GOOS == "darwin" {
-		script := fmt.Sprintf(`do shell script "%s %s \"%s\"" with administrator privileges`, wgQuickPath, action, profilePath)
+		baseName := strings.TrimSuffix(filepath.Base(profilePath), ".conf")
+		cmdStr := fmt.Sprintf("%s %s \"%s\"", wgQuickPath, action, profilePath)
+		if action == "down" {
+			// If tunnel was already down or ungracefully terminated, clean up stale state file
+			cmdStr = fmt.Sprintf("%s %s \"%s\" 2>/dev/null || rm -f /var/run/wireguard/%s.name", wgQuickPath, action, profilePath, baseName)
+		}
+		script := fmt.Sprintf(`do shell script "%s" with administrator privileges`, cmdStr)
 		cmd := exec.Command("osascript", "-e", script)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("authorization failed or cancelled: %s", strings.TrimSpace(string(out)))
+			outStr := strings.TrimSpace(string(out))
+			if strings.Contains(outStr, "User canceled") {
+				return fmt.Errorf("authorization cancelled by user")
+			}
+			return fmt.Errorf("%s", outStr)
 		}
 		return nil
 	}
