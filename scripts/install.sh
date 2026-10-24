@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 APP_NAME="ezwg"
 INSTALL_DIR="/usr/local/bin"
-REPO_OWNER=${REPO_OWNER:-"didikariyanto"}
+REPO_OWNER=${REPO_OWNER:-"didikari"}
 REPO_NAME=${REPO_NAME:-"WireGuard"}
 VERSION=${VERSION:-"1.0.0"}
 

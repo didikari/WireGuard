@@ -31,7 +31,7 @@
 Jalankan perintah ini di terminal **macOS** atau **Linux**:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ezwg/ezwg/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/didikari/WireGuard/main/scripts/install.sh | bash
 ```
 
 **Hasil instalasi otomatis:**
@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/ezwg/ezwg/main/scripts/install.sh |
 ### 2. Install dari Source (Pengembang / Developer)
 
 ```bash
-git clone https://github.com/ezwg/ezwg.git
+git clone https://github.com/didikari/WireGuard.git
 cd ezwg
 make build
 make gui
