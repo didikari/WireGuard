@@ -36,6 +36,7 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/checksums.txt
+          fail_on_unmatched_files: false
           draft: false
           prerelease: false
           generate_release_notes: true
