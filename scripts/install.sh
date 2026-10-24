@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 
 APP_NAME="ezwg"
 INSTALL_DIR="/usr/local/bin"
-REPO_OWNER="ezwg"
-REPO_NAME="ezwg"
+REPO_OWNER=${REPO_OWNER:-"didikariyanto"}
+REPO_NAME=${REPO_NAME:-"WireGuard"}
 VERSION=${VERSION:-"1.0.0"}
 
 echo -e "${CYAN}${BOLD}"
@@ -131,21 +131,44 @@ elif [ -f "./cmd/ezwg/root.go" ] && command -v go >/dev/null 2>&1; then
 # Option C: Download prebuilt release from GitHub
 else
     TAR_NAME="${APP_NAME}_${VERSION}_${OS}_${ARCH}.tar.gz"
-    RELEASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/${TAR_NAME}"
+    RELEASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${TAR_NAME}"
+    FALLBACK_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${VERSION}/${TAR_NAME}"
     TMP_DIR="$(mktemp -d)"
 
-    echo "Downloading ${RELEASE_URL}..."
+    echo "Downloading ${TAR_NAME} from GitHub Releases..."
+    DOWNLOAD_SUCCESS=false
+
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "${RELEASE_URL}" -o "${TMP_DIR}/${TAR_NAME}"
+        if curl -fsSL "${RELEASE_URL}" -o "${TMP_DIR}/${TAR_NAME}" 2>/dev/null; then
+            DOWNLOAD_SUCCESS=true
+        elif curl -fsSL "${FALLBACK_URL}" -o "${TMP_DIR}/${TAR_NAME}" 2>/dev/null; then
+            DOWNLOAD_SUCCESS=true
+        fi
     elif command -v wget >/dev/null 2>&1; then
-        wget -q "${RELEASE_URL}" -O "${TMP_DIR}/${TAR_NAME}"
+        if wget -q "${RELEASE_URL}" -O "${TMP_DIR}/${TAR_NAME}" 2>/dev/null; then
+            DOWNLOAD_SUCCESS=true
+        elif wget -q "${FALLBACK_URL}" -O "${TMP_DIR}/${TAR_NAME}" 2>/dev/null; then
+            DOWNLOAD_SUCCESS=true
+        fi
     fi
 
-    if [ -f "${TMP_DIR}/${TAR_NAME}" ]; then
+    if [ "${DOWNLOAD_SUCCESS}" = "true" ] && [ -s "${TMP_DIR}/${TAR_NAME}" ]; then
         tar -xzf "${TMP_DIR}/${TAR_NAME}" -C "${TMP_DIR}"
-        $SUDO mv "${TMP_DIR}/${APP_NAME}_${VERSION}_${OS}_${ARCH}/${APP_NAME}" "${INSTALL_DIR}/${APP_NAME}"
-        rm -rf "${TMP_DIR}"
-        INSTALLED=true
+        if [ -f "${TMP_DIR}/${APP_NAME}_${VERSION}_${OS}_${ARCH}/${APP_NAME}" ]; then
+            $SUDO mv "${TMP_DIR}/${APP_NAME}_${VERSION}_${OS}_${ARCH}/${APP_NAME}" "${INSTALL_DIR}/${APP_NAME}"
+            rm -rf "${TMP_DIR}"
+            INSTALLED=true
+        fi
+    fi
+
+    # Fallback to Go install if release binary download was unavailable
+    if [ "${INSTALLED}" = "false" ] && command -v go >/dev/null 2>&1; then
+        echo "Release binary not yet published on GitHub. Compiling directly via Go..."
+        GOBIN="/tmp" go install "github.com/${REPO_OWNER}/${REPO_NAME}/cmd/ezwg@latest" || true
+        if [ -f "/tmp/${APP_NAME}" ]; then
+            $SUDO mv "/tmp/${APP_NAME}" "${INSTALL_DIR}/${APP_NAME}"
+            INSTALLED=true
+        fi
     fi
 fi
 
