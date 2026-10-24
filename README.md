@@ -1,31 +1,30 @@
 # ezwg (Easy WireGuard) 🚀
 
-> **Aplikasi WireGuard Server & Client serba praktis untuk Linux dan macOS — tinggal install langsung jalan!**
+> **Aplikasi WireGuard Client GUI & Server Interaktif untuk Linux dan macOS — tinggal install langsung jalan!**
 > 
-> *The turnkey, cross-platform WireGuard CLI manager for Linux and macOS.*
+> *The turnkey WireGuard Client Desktop GUI & Interactive Server Manager for Linux and macOS.*
 
 ---
 
-## 🌟 Fitur Utama (Key Features)
+## 🌟 Fitur Unggulan
 
-- **Instalasi 1-Klik**: Skrip instalasi otomatis untuk Linux (Ubuntu/Debian, CentOS/RHEL, Fedora, Arch) dan macOS (Intel & Apple Silicon).
-- **Client VPN Mudah**:
-  - `ezwg client import <profile.conf>`: Import profil WireGuard secara lokal atau langsung dari URL.
-  - `ezwg connect`: Langsung konek ke VPN.
-  - `ezwg status`: Cek status koneksi, IP tunnel, bytes transferred (RX/TX), handshake time, dan ping latency.
-  - `ezwg disconnect`: Putuskan koneksi VPN.
-- **Server VPN Lengkap**:
-  - `ezwg server init`: Setup server WireGuard di VPS dengan otomatisasi IP forwarding, iptables/nftables firewall, NAT masquerading, dan pembuatan kunci.
-  - `ezwg server add-peer <nama>`: Tambah client baru dengan alokasi IP otomatis, langsung tampilkan **QR Code** untuk HP dan file `.conf` untuk Mac/Linux.
-  - `ezwg server list-peers`: Monitor daftar pengguna aktif beserta statistik pemakaian kuota/bandwidth secara realtime.
-  - `ezwg server remove-peer <nama>`: Hapus hak akses client secara instan (hot-reload tanpa restart server).
-- **ezwg Doctor (`ezwg doctor`)**:
-  - Mendiagnosa kesiapan sistem: kernel module WireGuard, `wg-quick`, `resolvconf`, iptables, sysctl IP forward.
-  - Opsi auto-fix (`ezwg doctor --fix`) untuk memasang dependensi yang kurang secara otomatis.
+- **🖥️ Client Desktop GUI (Tinggal Klik)**:
+  - Tersedia aplikasi visual desktop (**Easy WireGuard.app** untuk macOS dan Desktop Launcher untuk Linux).
+  - Import file `.conf` hanya dengan klik tombol file picker.
+  - Tombol **Connect / Disconnect** besar dengan indikator status visual (Hijau / Merah).
+  - Pemantauan metrik realtime: IP tunnel, transfer data RX/TX, handshake terakhir, dan ping latency.
+- **⚙️ Server Setup Interaktif (Anti Ribet)**:
+  - Cukup jalankan `sudo ezwg server` di VPS Linux Anda.
+  - **Setup Wizard Otomatis**: Mendeteksi IP publik server, network interface (eth0/ens3), mengatur firewall NAT iptables, dan mengaktifkan IP forwarding secara otomatis.
+  - **Interactive Management Menu**: Menambah client baru, menampilkan QR Code untuk HP, melihat daftar pengguna yang sedang online, atau mencabut akses user hanya dengan memilih menu angka (1-7).
+- **📥 One-Click Installer**:
+  - Skrip universal yang otomatis mendeteksi arsitektur (Apple Silicon M1/M2/M3/M4, Intel x86_64, Linux AMD64 & ARM64) dan menyiapkan seluruh dependensi WireGuard secara otomatis.
+- **🩺 ezwg Doctor (`ezwg doctor`)**:
+  - Diagnostik kesehatan sistem dan modul WireGuard dengan opsi perbaikan otomatis (`ezwg doctor --fix`).
 
 ---
 
-## 📥 Cara Install (Installation)
+## 📥 Cara Install (Linux & macOS)
 
 ### 1. Menggunakan One-Line Installer (Rekomendasi)
 
@@ -35,138 +34,111 @@ Jalankan perintah ini di terminal **macOS** atau **Linux**:
 curl -fsSL https://raw.githubusercontent.com/ezwg/ezwg/main/scripts/install.sh | bash
 ```
 
-Skrip ini akan otomatis:
-1. Mendeteksi sistem operasi (macOS / Linux) dan arsitektur CPU (`amd64` / `arm64`).
-2. Memasang dependensi WireGuard (`wireguard-tools`, `wireguard-go`) jika belum ada.
-3. Memasang binary `ezwg` ke `/usr/local/bin/ezwg`.
-4. Menjalankan diagnosa awal `ezwg doctor`.
+**Hasil instalasi otomatis:**
+* **Di macOS**: Aplikasi **`Easy WireGuard.app`** otomatis terpasang di folder `/Applications` (bisa dibuka langsung dari Launchpad / Spotlight) serta CLI `ezwg` di terminal.
+* **Di Linux**: Launcher desktop otomatis terpasang di menu aplikasi (Ubuntu Dash / GNOME / KDE) serta CLI `ezwg` di `/usr/local/bin`.
 
 ---
 
-### 2. Install dari Source (Jika sudah ada Go)
+### 2. Install dari Source (Pengembang / Developer)
 
 ```bash
 git clone https://github.com/ezwg/ezwg.git
 cd ezwg
 make build
+make gui
 sudo make install
 ```
 
 ---
 
-## 📖 Panduan Penggunaan (Usage Guide)
+## 💻 Panduan Penggunaan Client
 
-### A. Sebagai Client VPN (Koneksi ke VPN)
+### Opsi A: Menggunakan Tampilan GUI (Desktop)
+1. Buka aplikasi **Easy WireGuard** dari Launchpad / Applications di Mac, atau Menu Aplikasi di Linux.
+   *(Atau dari terminal cukup ketik: `ezwg gui`)*.
+2. Klik tombol **`Import .conf`** dan pilih file konfigurasi WireGuard Anda.
+3. Klik tombol **`Connect`**!
+4. Status akan langsung berubah menjadi hijau, dan metrik kecepatan serta transfer data akan tampil secara realtime.
 
-Jika Anda memiliki file konfigurasi `.conf` dari kantor, VPS pribadi, atau penyedia VPN:
-
-#### 1. Import Profil
+### Opsi B: Menggunakan Terminal (CLI)
 ```bash
-# Dari file lokal
+# Import profil konfigurasi
 ezwg client import ~/Downloads/kantor.conf --name kantor
 
-# Atau dari URL
-ezwg client import https://my-server.com/client.conf --name myvpn
-```
-
-#### 2. Konek ke VPN
-```bash
-# Menggunakan shortcut
+# Konek ke VPN
 ezwg connect kantor
 
-# Atau jika hanya ada 1 profil, cukup:
-ezwg connect
-```
-
-#### 3. Cek Status & Kecepatan
-```bash
+# Cek status & latency
 ezwg status
-```
-*Output menampilkan IP tunnel, public key, server endpoint, total data RX/TX, dan latency ping.*
 
-#### 4. Putuskan Koneksi
-```bash
+# Putuskan koneksi
 ezwg disconnect
 ```
 
-#### 5. Lihat Semua Profil Tersimpan
-```bash
-ezwg client list
-```
-
 ---
 
-### B. Sebagai Server VPN (Setup di Linux VPS)
+## 🖥️ Panduan Penggunaan Server (di VPS Linux)
 
-Jika Anda ingin menjadikan VPS (Ubuntu, Debian, dsb.) sebagai server VPN pribadi:
+Kini Anda tidak perlu lagi menghafal perintah atau konfigurasi manual di VPS.
 
-#### 1. Inisialisasi Server
-Jalankan perintah berikut di VPS Anda:
+### 1. Jalankan Server Wizard & Control Panel
+Di server VPS Anda, cukup ketik:
 ```bash
-sudo ezwg server init
-```
-*`ezwg` akan otomatis mendeteksi IP publik server, network interface (misal: `eth0`), mengaktifkan `net.ipv4.ip_forward=1`, mengatur NAT iptables, dan menjalankan service WireGuard.*
-
-Opsi kustomisasi (opsional):
-```bash
-sudo ezwg server init --port 51820 --subnet 10.8.0.1/24 --dns "1.1.1.1, 8.8.8.8"
+sudo ezwg server
 ```
 
-#### 2. Tambah Pengguna / Client Baru
-```bash
-sudo ezwg server add-peer macbook-didik
-```
-**Output:**
-- Menghasilkan file konfigurasi di `/etc/wireguard/clients/macbook-didik.conf`.
-- Menampilkan gambar **QR Code** di terminal (tinggal scan pakai kamera aplikasi WireGuard di iPhone/Android).
-- Menghasilkan konfigurasi siap pakai untuk Mac/Linux.
-
-#### 3. Monitor Pengguna yang Sedang Online
-```bash
-sudo ezwg server list-peers
-```
-Contoh tampilan:
+#### Jika Server Baru Pertama Kali Dijalankan:
+Aplikasi akan membuka **Interactive Setup Wizard**:
 ```text
-STATUS     NAME             ALLOWED IP    ENDPOINT               LAST HANDSHAKE   RX / TX
-● Online   macbook-didik    10.8.0.2/32   180.252.10.15:54321    15s ago          2.34 MiB / 14.81 MiB
-○ Idle     hp-android       10.8.0.3/32   none                   never            0 B / 0 B
+╔════════════════════════════════════════════════════════════╗
+║          Easy WireGuard (ezwg) Server Setup Wizard         ║
+╚════════════════════════════════════════════════════════════╝
+Enter server Public IP or Domain [103.125.10.25]: <Tekan Enter>
+Outbound Network Interface for NAT [eth0]: <Tekan Enter>
+WireGuard UDP Listen Port [51820]: <Tekan Enter>
+VPN IPv4 Subnet [10.8.0.1/24]: <Tekan Enter>
+DNS Resolvers for Clients [1.1.1.1, 8.8.8.8]: <Tekan Enter>
+
+Applying configuration...
+🎉 WireGuard Server successfully initialized and running!
 ```
 
-#### 4. Cabut / Hapus Pengguna
-```bash
-sudo ezwg server remove-peer macbook-didik
+#### Setelah Server Aktif:
+Menjalankan `sudo ezwg server` akan langsung membuka **Interactive Menu**:
+```text
+════════════════════════════════════════════════════════════
+                 ezwg Server Control Panel                  
+════════════════════════════════════════════════════════════
+Interface: wg0 (● Running)  |  Registered Clients: 2
+
+  1) ➕ Add a New Client
+  2) 📋 List Clients & Realtime Traffic
+  3) 📱 Show Client QR Code & Configuration
+  4) ❌ Revoke / Delete a Client
+  5) 🔄 Restart WireGuard Server
+  6) 🛑 Stop WireGuard Server
+  7) 🚪 Exit
+────────────────────────────────────────────────────────────
+Select an option [1-7]: 
 ```
+
+* **Pilih 1**: Masukkan nama user (misal: `macbook-didik`). Sistem akan otomatis mengalokasikan IP VPN, membuat kunci enkripsi, dan langsung mencetak **QR Code** di terminal (bisa langsung di-scan pakai HP) serta menyimpan file `.conf`.
+* **Pilih 2**: Menampilkan status online/idle, waktu koneksi terakhir, dan kuota upload/download masing-masing client.
+* **Pilih 3**: Menampilkan kembali QR code dan file `.conf` client tertentu.
+* **Pilih 4**: Mencabut akses VPN client secara instan tanpa perlu restart server.
 
 ---
 
-### C. System Doctor & Perbaikan Otomatis
+## 🛠️ Perintah Diagnostik (`ezwg doctor`)
 
-Untuk memastikan perangkat Anda memiliki semua dependensi yang dibutuhkan:
+Untuk memeriksa kesiapan perangkat Anda (kernel module, DNS resolver, firewall iptables):
 ```bash
 ezwg doctor
-```
 
-Jika ada dependensi yang kurang, jalankan dengan bendera `--fix`:
-```bash
+# Memperbaiki dependensi yang kurang secara otomatis:
 ezwg doctor --fix
 ```
-
----
-
-## 🛠️ Cross-Compilation & Build Release
-
-Untuk menghasilkan paket rilis mandiri bagi semua platform (macOS x86_64, macOS Apple Silicon M1/M2/M3/M4, Linux x86_64, Linux ARM64):
-
-```bash
-make dist
-```
-
-File output akan berada di folder `dist/`:
-- `ezwg_1.0.0_darwin_amd64.tar.gz` (Mac Intel)
-- `ezwg_1.0.0_darwin_arm64.tar.gz` (Mac Apple Silicon)
-- `ezwg_1.0.0_linux_amd64.tar.gz` (Linux x86_64 / PC / Server)
-- `ezwg_1.0.0_linux_arm64.tar.gz` (Linux ARM64 / Raspberry Pi / AWS Graviton)
-- `checksums.txt` (SHA256 checksums)
 
 ---
 

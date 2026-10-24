@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Easy WireGuard
+Comment=Turnkey WireGuard VPN Client Manager
+Exec=/usr/local/bin/ezwg-gui
+Icon=network-vpn
+Terminal=false
+Type=Application
+Categories=Network;Security;VPN;
+StartupNotify=true

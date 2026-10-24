@@ -101,7 +101,7 @@ elif [ "${OS}" = "linux" ]; then
     fi
 fi
 
-# 4. Install ezwg binary
+# 4. Install ezwg CLI & GUI binary
 echo -e "\n${CYAN}📦 Installing ${APP_NAME} to ${INSTALL_DIR}...${NC}"
 $SUDO mkdir -p "${INSTALL_DIR}"
 
@@ -111,12 +111,22 @@ INSTALLED=false
 if [ -f "./bin/ezwg" ]; then
     echo "Installing from local ./bin/ezwg..."
     $SUDO cp ./bin/ezwg "${INSTALL_DIR}/${APP_NAME}"
+    if [ -f "./bin/ezwg-gui" ]; then
+        $SUDO cp ./bin/ezwg-gui "${INSTALL_DIR}/ezwg-gui"
+    fi
     INSTALLED=true
 # Option B: Go is available in the current project directory
 elif [ -f "./cmd/ezwg/root.go" ] && command -v go >/dev/null 2>&1; then
     echo "Compiling from local source using Go..."
     go build -ldflags="-s -w" -o "/tmp/${APP_NAME}" ./cmd/ezwg
     $SUDO mv "/tmp/${APP_NAME}" "${INSTALL_DIR}/${APP_NAME}"
+    if [ -d "./cmd/ezwg-gui" ]; then
+        echo "Compiling ezwg-gui client..."
+        go build -ldflags="-s -w" -o "/tmp/ezwg-gui" ./cmd/ezwg-gui || true
+        if [ -f "/tmp/ezwg-gui" ]; then
+            $SUDO mv "/tmp/ezwg-gui" "${INSTALL_DIR}/ezwg-gui"
+        fi
+    fi
     INSTALLED=true
 # Option C: Download prebuilt release from GitHub
 else
@@ -145,9 +155,26 @@ if [ "${INSTALLED}" = "false" ]; then
 fi
 
 $SUDO chmod 755 "${INSTALL_DIR}/${APP_NAME}"
+if [ -f "${INSTALL_DIR}/ezwg-gui" ]; then
+    $SUDO chmod 755 "${INSTALL_DIR}/ezwg-gui"
+fi
 
 # Create alias symlink ezwireguard -> ezwg
 $SUDO ln -sf "${INSTALL_DIR}/${APP_NAME}" "${INSTALL_DIR}/ezwireguard"
+
+# Install macOS .app bundle to /Applications if available
+if [ "${OS}" = "darwin" ]; then
+    if [ -d "./dist/Easy WireGuard.app" ]; then
+        echo "Installing Easy WireGuard.app to /Applications..."
+        $SUDO rm -rf "/Applications/Easy WireGuard.app"
+        $SUDO cp -r "./dist/Easy WireGuard.app" /Applications/
+    fi
+elif [ "${OS}" = "linux" ]; then
+    if [ -f "./assets/ezwg.desktop" ] && [ -d "/usr/share/applications" ]; then
+        echo "Installing Linux desktop launcher..."
+        $SUDO cp ./assets/ezwg.desktop /usr/share/applications/
+    fi
+fi
 
 echo -e "${GREEN}✔ ${APP_NAME} successfully installed in ${INSTALL_DIR}/${APP_NAME}!${NC}"
 
@@ -157,16 +184,23 @@ echo -e "\n${CYAN}🩺 Running system diagnostic check...${NC}"
 
 echo -e "\n${GREEN}${BOLD}🎉 Installation Complete!${NC}"
 echo "================================================================"
-echo -e "You can now use ${BOLD}ezwg${NC} anywhere in your terminal."
+echo -e "You can now use ${BOLD}ezwg${NC} anywhere in your terminal or launch the GUI app."
 echo ""
-echo -e "${BOLD}Client Usage (Connect to VPN):${NC}"
+echo -e "${BOLD}🖥️ Client Desktop GUI:${NC}"
+if [ "${OS}" = "darwin" ]; then
+    echo "  Open 'Easy WireGuard' from your Applications / Launchpad"
+    echo "  Or in terminal: ezwg gui"
+else
+    echo "  Open 'Easy WireGuard' from your Application menu"
+    echo "  Or in terminal: ezwg gui"
+fi
+echo ""
+echo -e "${BOLD}💻 Client CLI (Quick Commands):${NC}"
 echo "  ezwg client import /path/to/profile.conf"
 echo "  ezwg connect"
 echo "  ezwg status"
 echo "  ezwg disconnect"
 echo ""
-echo -e "${BOLD}Server Usage (Setup VPN Server on VPS):${NC}"
-echo "  sudo ezwg server init"
-echo "  sudo ezwg server add-peer my-laptop"
-echo "  sudo ezwg server list-peers"
+echo -e "${BOLD}⚙️ Server Interactive Setup (on VPS):${NC}"
+echo "  sudo ezwg server         # Interactive setup wizard & menu"
 echo "================================================================"

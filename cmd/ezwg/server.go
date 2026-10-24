@@ -25,6 +25,20 @@ var serverCmd = &cobra.Command{
 	Aliases: []string{"srv"},
 	Short:   "Manage WireGuard VPN server on Linux/macOS",
 	Long:    "Initialize, manage peers, and monitor a WireGuard VPN server.",
+	Run: func(cmd *cobra.Command, args []string) {
+		s := server.NewServerManager(serverConfigPath)
+		if !s.IsInitialized() {
+			if err := s.RunInteractiveInit(); err != nil {
+				color.Red("❌ Setup failed: %v", err)
+				os.Exit(1)
+			}
+			return
+		}
+		if err := s.RunInteractiveMenu(); err != nil {
+			color.Red("❌ Error: %v", err)
+			os.Exit(1)
+		}
+	},
 }
 
 var serverInitCmd = &cobra.Command{
@@ -35,6 +49,14 @@ var serverInitCmd = &cobra.Command{
 		if s.IsInitialized() {
 			color.Yellow("Server is already initialized at: %s", serverConfigPath)
 			color.Yellow("To add clients, run: ezwg server add-peer <name>")
+			return
+		}
+
+		if serverPublicIP == "" {
+			if err := s.RunInteractiveInit(); err != nil {
+				color.Red("❌ Setup failed: %v", err)
+				os.Exit(1)
+			}
 			return
 		}
 
@@ -58,6 +80,20 @@ var serverInitCmd = &cobra.Command{
 		fmt.Println()
 		color.Cyan("Next step: Create client profiles with:")
 		color.White("  ezwg server add-peer my-laptop")
+	},
+}
+
+var serverMenuCmd = &cobra.Command{
+	Use:   "menu",
+	Short: "Launch interactive server management menu",
+	Run: func(cmd *cobra.Command, args []string) {
+		s := server.NewServerManager(serverConfigPath)
+		if !s.IsInitialized() {
+			color.Yellow("Server is not initialized yet. Launching setup wizard...")
+			_ = s.RunInteractiveInit()
+			return
+		}
+		_ = s.RunInteractiveMenu()
 	},
 }
 
@@ -242,6 +278,7 @@ func init() {
 	serverCmd.PersistentFlags().StringVarP(&serverConfigPath, "config", "c", "/etc/wireguard/wg0.conf", "Path to WireGuard server configuration file")
 
 	serverCmd.AddCommand(serverInitCmd)
+	serverCmd.AddCommand(serverMenuCmd)
 	serverCmd.AddCommand(serverAddPeerCmd)
 	serverCmd.AddCommand(serverRemovePeerCmd)
 	serverCmd.AddCommand(serverListPeersCmd)
