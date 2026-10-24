@@ -127,7 +127,7 @@ if [ "${OS}" = "linux" ]; then
     echo -e "\n${CYAN}🔍 Checking Linux dependencies...${NC}"
     if ! command -v wg-quick >/dev/null 2>&1; then
         if command -v apt-get >/dev/null 2>&1; then
-            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq wireguard-tools resolvconf
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq wireguard-tools
         elif command -v dnf >/dev/null 2>&1; then
             $SUDO dnf install -y wireguard-tools
         elif command -v pacman >/dev/null 2>&1; then

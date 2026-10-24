@@ -88,7 +88,7 @@ elif [ "${OS}" = "linux" ]; then
     if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
         echo -e "${YELLOW}Installing missing dependencies: ${MISSING_PKGS[*]}...${NC}"
         if command -v apt-get >/dev/null 2>&1; then
-            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq wireguard wireguard-tools resolvconf iptables
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq wireguard wireguard-tools iptables
         elif command -v dnf >/dev/null 2>&1; then
             $SUDO dnf install -y wireguard-tools iptables
         elif command -v yum >/dev/null 2>&1; then
