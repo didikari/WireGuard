@@ -10,6 +10,8 @@
 
 - **🖥️ Client Desktop GUI (Tinggal Klik)**:
   - Tersedia aplikasi visual desktop (**Easy WireGuard.app** untuk macOS dan Desktop Launcher untuk Linux).
+  - **Menu Bar / System Tray Support (macOS)**: Berjalan di status bar atas dengan indikator titik hijau aktif, 1-click Connect/Disconnect langsung dari menu bar, dan fitur *close-to-tray* (koneksi tetap aktif di background saat jendela ditutup).
+  - Otorisasi aman terintegrasi dengan Touch ID / Administrator Dialog macOS.
   - Import file `.conf` hanya dengan klik tombol file picker.
   - Tombol **Connect / Disconnect** besar dengan indikator status visual (Hijau / Merah).
   - Pemantauan metrik realtime: IP tunnel, transfer data RX/TX, handshake terakhir, dan ping latency.
@@ -143,6 +145,67 @@ Select an option [1-7]:
 * **Pilih 2**: Menampilkan status online/idle, waktu koneksi terakhir, dan kuota upload/download masing-masing client.
 * **Pilih 3**: Menampilkan kembali QR code dan file `.conf` client tertentu.
 * **Pilih 4**: Mencabut akses VPN client secara instan tanpa perlu restart server.
+
+---
+
+## 🌐 Integrasi MikroTik (Remote MikroTik Tanpa IP Publik)
+
+Anda dapat menghubungkan router **MikroTik (RouterOS v7)** ke server `ezwg` agar router cabang, kantor, atau rumah dapat di-remote via **WinBox**, **WebFig**, maupun **SSH** dari mana saja — **meskipun MikroTik berada di belakang NAT / ISP tanpa IP Publik (CGNAT seperti IndiHome, GSM 4G/5G, dsb.)**.
+
+### Topologi Hub-and-Spoke
+```text
+[ Laptop / WinBox Anda ] (10.8.0.2)
+          │
+          ▼ (Easy WireGuard VPN)
+[ Server ezwg Pusat ] (10.8.0.1) ◄─── IP Publik Server VPS
+          ▲
+          │ (WireGuard Tunnel via NAT)
+[ MikroTik Remote / Cabang ] (10.8.0.5) ─── Tanpa butuh IP Publik!
+```
+
+### Langkah Setup MikroTik (RouterOS v7):
+
+#### 1. Buat Peer untuk MikroTik di Server ezwg
+Di server VPS Anda, jalankan:
+```bash
+sudo ezwg server
+# Pilih menu 1 (Add a New Client) -> masukkan nama: mikrotik-cabang
+```
+Catat informasi yang dihasilkan:
+- **Client IP**: misalnya `10.8.0.5/32`
+- **PrivateKey**: kunci privat client
+- **Server PublicKey**: kunci publik server
+- **Server Endpoint**: `IP_SERVER:51820`
+
+#### 2. Konfigurasi di Terminal MikroTik
+Buka New Terminal di WinBox atau SSH MikroTik remote, lalu jalankan:
+
+```routeros
+# 1. Buat Interface WireGuard
+/interface wireguard add name=wg-ezwg private-key="<PRIVATE_KEY_CLIENT>" listen-port=13231 mtu=1420
+
+# 2. Pasang IP Address VPN pada interface
+/ip address add address=10.8.0.5/24 interface=wg-ezwg
+
+# 3. Tambahkan Peer ke Server Pusat
+/interface wireguard peers add interface=wg-ezwg \
+    public-key="<PUBLIC_KEY_SERVER>" \
+    endpoint-address=<IP_PUBLIK_SERVER> \
+    endpoint-port=51820 \
+    allowed-address=10.8.0.0/24 \
+    persistent-keepalive=25s
+```
+
+> [!NOTE]
+> Parameter `persistent-keepalive=25s` sangat penting agar router MikroTik menjaga koneksi tunnel UDP tetap terbuka menembus firewall provider secara terus-menerus.
+
+#### 3. Remote MikroTik dari Laptop Anda
+1. Hubungkan VPN pada laptop menggunakan aplikasi **Easy WireGuard**.
+2. Buka **WinBox**, lalu pada kolom *Connect To*, masukkan IP VPN MikroTik:
+   ```text
+   10.8.0.5
+   ```
+3. Masukkan user & password router MikroTik -> **Connect**. Router langsung terbuka secara instan dan aman!
 
 ---
 
